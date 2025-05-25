@@ -17,6 +17,8 @@ from .ccsMorph import ccsMorph
 from .ccsLight import ccsLight
 from .ccsEffect import ccsEffect
 from .ccsPCM import ccsPCM
+from .ccsParticleGenerator import ccsParticleGenerator
+from .ccsParticleAnmCtrl import ccsParticleAnmCtrl
 from time import perf_counter
 from .Anms import *
 import gzip, zlib

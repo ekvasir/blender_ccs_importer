@@ -3,7 +3,6 @@ from .Eff import makeEffect, makeMaterial
 
 
 class ccsEffect(BrStruct):
-
     def __init__(self):
         self.name = ""
         self.type = "Effect"
