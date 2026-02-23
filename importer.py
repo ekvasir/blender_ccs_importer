@@ -1550,7 +1550,7 @@ class importCCS:
             
             startQuat = brot
             for frame, locrotscaleop in anim.objects[obj].items():
-                loc, rot, scale, opacity, _, _, _ = locrotscaleop
+                loc, rot, scale, opacity = locrotscaleop[:4]
 
                 loc = Vector(loc) * 0.01
                 bind_loc = Vector(bloc)
@@ -1718,7 +1718,7 @@ class importCCS:
                 rotations = {}
                 fovs = {}
                 for frame, values in anim.cameras[cam].items():
-                    loc, rot, fov = values
+                    loc, rot, fov = values[:3]
                     locations[frame] = Vector(loc) * 0.01
                     rotations[frame] = [radians(r) for r in rot] 
                     fovs[frame] = [cameraObject.data.sensor_width / (2 * math.tan(radians(fov) / 2))]
@@ -1780,7 +1780,7 @@ class importCCS:
                             energy = {}
                             color = {}
                             for frame, values in anim.lights[light].items():
-                                rot, col, en = values[:3]
+                                rot, col, en = values[1:4]
                                 rotations[frame] = [radians(r) for r in rot] 
                                 energy[frame] = [en]
                                 color[frame] = [c / 255 for c in col]
@@ -1823,7 +1823,7 @@ class importCCS:
                             radOuter = {}
                             scales = {}
                             for frame, values in anim.lights[light].items():
-                                loc, col, en, radi, rado = values[:5]
+                                loc, col, en, radi, rado = values[1:6]
                                 locations[frame] = Vector(loc) * 0.01
                                 color[frame] = [c / 255 for c in col]
                                 energy[frame] = [en]

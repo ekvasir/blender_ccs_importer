@@ -43,7 +43,7 @@ def anmChunkReader(self, br: BinaryReader, indexTable, version):
     def read_camera_frame():
         cam_f = br.read_struct(cameraFrame, None, current_frame, indexTable)
         self.cameras[cam_f.name][current_frame] = (
-            cam_f.position, cam_f.rotation, cam_f.fov
+            cam_f.position, cam_f.rotation, cam_f.fov, cam_f.unk, cam_f.index, cam_f.ctrlFlags
         )
 
     def read_morph_controller():
@@ -75,7 +75,7 @@ def anmChunkReader(self, br: BinaryReader, indexTable, version):
     def read_distant_light_frame():
         light_f = br.read_struct(distantLightFrame, None, current_frame, indexTable)
         self.lights[light_f.lightObject][current_frame] = (
-            light_f.rotation, light_f.color, light_f.intensity, light_f.lightIndex, light_f.flags
+            light_f.frameType, light_f.rotation, light_f.color, light_f.intensity, light_f.lightIndex, light_f.flags
         )
 
     def read_ambient_frame():
@@ -96,7 +96,7 @@ def anmChunkReader(self, br: BinaryReader, indexTable, version):
     def read_omni_light_frame():
         light_f = br.read_struct(omniLightFrame, None, current_frame, indexTable)
         self.lights[light_f.lightObject][current_frame] = (
-            light_f.position, light_f.color, light_f.intensity, light_f.radiusInner, light_f.radiusOuter, light_f.lightIndex, light_f.flags
+            light_f.frameType, light_f.position, light_f.color, light_f.intensity, light_f.radiusInner, light_f.radiusOuter, light_f.lightIndex, light_f.flags
         )
 
     def read_note_frame():
@@ -172,6 +172,11 @@ def anmChunkWriter(self, br: BinaryReader, version=0x120, sortedChunks=None):
                 anmCtrl_type = 'ObjectController'
                 write_anmCtrlChunk(br, objController, anmCtrl_type, current_frame)
 
+            # Camera controllers
+            for camController in self.cameraControllers:
+                anmCtrl_type = 'CameraController'
+                write_anmCtrlChunk(br, camController, anmCtrl_type, current_frame)
+
             # Material Controllers
             for matController in self.materialControllers:
                 anmCtrl_type = 'MaterialController'
@@ -213,23 +218,47 @@ def anmChunkWriter(self, br: BinaryReader, version=0x120, sortedChunks=None):
 
                         frame_type = 'ObjectFrame'
                         write_frameChunk(br, obj_f, frame_type, current_frame)
+                      
+            # Write cameraFrames  
+            for camera_name, frames in self.cameras.items():
+                for f, frame_data in frames.items():
+                    if current_frame == f:
+
+                        # Unpack Camera frame_data
+                        pos, rot, fov, unk, index, flags = frame_data
+
+                        cam_f = cameraFrame()
+                        cam_f.index = index
+                        cam_f.ctrlFlags = flags
+                        cam_f.position = pos
+                        cam_f.rotation = rot
+                        cam_f.fov = fov
+                        cam_f.unk = unk
+
+                        frame_type = 'CameraFrame'
+                        write_frameChunk(br, cam_f, frame_type, current_frame)
 
             # Write lightFrames
-            lightChunks = {chunk.name: chunk for chunk in sortedChunks["Light"]}
             for light_Name, frames in self.lights.items():
-                #print(f"self.lights.items(): {frames}")
 
                 for f, frame_data in frames.items():
                     #print(f"light_Name: {light_Name}, frames.items() {frames.items()}")
                     if current_frame == f:
 
-                        lightChunk = lightChunks.get(light_Name)
+                        if light_Name == 'Ambient':
+                            light_f = ambientFrame()
+                            light_f.color = frame_data
+                            write_frameChunk(br, light_f, light_Name, current_frame)
+                            continue
 
-                        if lightChunk.lightType.name == 'DistantLight':
+                        frame_type = frame_data[0]
+                        print(f"chunk.name: {frame_type}")
+
+                        if frame_type == 'DistantLight':
                             #print(f"lightChunk.type: {lightChunk.lightType} frame# {f}")
 
                             # Unpack DistantLight frame_data
-                            rot, clr, en, index, flags = frame_data
+                            type, rot, clr, en, index, flags = frame_data
 
                             light_f = distantLightFrame()
                             light_f.lightIndex = index
@@ -237,14 +266,14 @@ def anmChunkWriter(self, br: BinaryReader, version=0x120, sortedChunks=None):
                             light_f.rotation = rot
                             light_f.color = clr
                             light_f.intensity = en
-                            frame_type = 'DistantLightFrame'
+                            frame_type = type
                             write_frameChunk(br, light_f, frame_type, current_frame)
 
-                        if lightChunk.lightType.name == 'OmniLight':
+                        elif frame_type == 'OmniLight':
                             #print(f"lightChunk.type: {lightChunk.lightType} frame# {f}")
 
                             # Unpack OmniLight frame_data
-                            pos, clr, inte, radi, rado, index, flags = frame_data
+                            type, pos, clr, inte, radi, rado, index, flags = frame_data
 
                             light_f = omniLightFrame()
                             light_f.lightIndex = index
@@ -254,8 +283,9 @@ def anmChunkWriter(self, br: BinaryReader, version=0x120, sortedChunks=None):
                             light_f.intensity = inte
                             light_f.radiusInner = radi
                             light_f.radiusOuter = rado
-                            frame_type = 'OmniLightFrame'
+                            frame_type = type
                             write_frameChunk(br, light_f, frame_type, current_frame)
+
 
             for note_name, frames in self.notes.items():
                 #print(f"object_Name: {object_name}, frames.items() {frames.items()}")
@@ -302,7 +332,10 @@ def write_anmCtrlChunk(br: BinaryReader, anmCtrl_data, anmCtrl_type, current_fra
 
 
 def write_frameChunk(br: BinaryReader, frame_data, frame_type, current_frame):
-    br.write_uint16(CCSTypes[frame_type].value)
+    if frame_type == 'Ambient':
+        br.write_uint16(0x0601) # Write AmbientFrame type
+    else:
+        br.write_uint16(CCSTypes[frame_type].value)
     br.write_uint16(0xCCCC) # Write 0xCCCC bytes
     # create temeperay buffer
     afChunk_buf = BinaryReader(encoding='cp932')
@@ -591,6 +624,7 @@ class cameraFrame(BrStruct):
         self.position = [0, 0, 0]
         self.rotation = [0, 0, 0]
         self.fov = 45
+        self.unk = 0
 
     def __br_read__(self, br: BinaryReader, currentFrame, indexTable):
         self.index = br.read_uint32()
@@ -614,6 +648,27 @@ class cameraFrame(BrStruct):
             self.unk = br.read_float32()
         if not self.ctrlFlags & 100:
             self.fov = br.read_float32()
+
+    def __br_write__(self, br: BinaryReader, currentFrame):
+        br.write_uint32(self.index)
+        br.write_uint32(self.ctrlFlags)
+
+        if self.ctrlFlags & 2 == 0:
+            br.write_float32(self.position[0])
+        if self.ctrlFlags & 4 == 0:
+            br.write_float32(self.position[1])
+        if self.ctrlFlags & 8 == 0:
+            br.write_float32(self.position[2])
+        if self.ctrlFlags & 10 == 0:
+            br.write_float32(self.rotation[0])
+        if self.ctrlFlags & 20 == 0:
+            br.write_float32(self.rotation[1])
+        if self.ctrlFlags & 40 == 0:
+            br.write_float32(self.rotation[2])
+        if self.ctrlFlags & 80 == 0:
+            br.write_float32(self.unk)
+        if self.ctrlFlags & 100 == 0:
+            br.write_float32(self.fov)
 
     def finalize(self, chunks):
         self.camera = chunks[self.index]
@@ -677,6 +732,7 @@ class distantLightFrame(BrStruct):
         self.lightIndex = br.read_uint32()
         self.lightObject = indexTable.Names[self.lightIndex][0]
         self.name = indexTable.Names[self.lightIndex][0]
+        self.frameType = 'DistantLightFrame'
         
         self.flags = br.read_uint32()
         self.rotation = br.read_float32(3)
@@ -708,6 +764,9 @@ class ambientFrame(BrStruct):
     def __br_read__(self, br: BinaryReader, currentFrame):
         self.color = br.read_uint8(4)
         self.frame = currentFrame
+
+    def __br_write__(self, br: BinaryReader, currentFrame):
+        br.write_uint8(self.color)
 
 
 class noteFrame(BrStruct):
@@ -894,6 +953,7 @@ class omniLightFrame(BrStruct):
         self.lightIndex = br.read_uint32()
         self.lightObject = indexTable.Names[self.lightIndex][0]
         self.name = indexTable.Names[self.lightIndex][0]
+        self.frameType = 'OmniLightFrame'
         self.frame = currentFrame
 
         self.flags = br.read_uint32()

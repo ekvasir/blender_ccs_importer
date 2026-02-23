@@ -19,6 +19,29 @@ class ccsStream(BrStruct):
         currentFrame = 0
         anmChunkReader(self, br, indexTable, version)
 
+    def  __br_write__(self, br: BinaryReader, version, sortedChunks):
+        br.write_uint32(self.frameCount)
+        anmChunkWriter(self, br, version, sortedChunks)
+    
+    def finalize(self, chunks):
+        for objectCtrl in self.objectControllers:
+            objectCtrl.finalize(self.chunks)
+        
+        for cameraCtrl in self.cameraControllers:
+            cameraCtrl.finalize(self.chunks)
+        
+        for distantLightCtrl in self.distantLightControllers:
+            distantLightCtrl.finalize(self.chunks)
+        
+        '''#or directLightCtrl in self.directLightControllers:
+            directLightCtrl.finalize(self.chunks)'''
+        
+        '''#or spotLightCtrl in self.spotLightControllers:
+            dspotLightCtrl.finalize(self.chunks)'''
+        
+        for omniLightCtrl in self.omniLightControllers:
+            omniLightCtrl.finalize(self.chunks)
+
 
 class ccsStreamOutlineParam(BrStruct):
     def __init__(self):

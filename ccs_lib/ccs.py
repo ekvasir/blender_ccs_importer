@@ -118,39 +118,60 @@ class ccsFile(BrStruct):
         # Write regular chunks
         #print(f"self.ccsfChunks: {self.ccsfChunks}")
         for i, chunk in enumerate(self.originalChunks):
-            # Write chunk type
-            br.write_uint16(CCSTypes[chunk.type].value)
-            br.write_uint16(0xCCCC)  # Write 0xCCCC bytes
+            if not chunk.type == "Stream":
 
-            # Create chunk buffer data
-            chunk_start = br.pos()
-            chunk_buf = BinaryReader()
-            if chunk.type == "Animation":
-                chunk_buf.write_struct(chunk, exportVersion, self.sortedChunks)
-            else:
-                chunk_buf.write_struct(chunk, exportVersion)
-            # Write chunk size
-            if chunk.type == "Texture" and chunk.textureType in {0x0, 0x13, 0x14}: # is RGBA32/I8/I4 Texture
-                br.write_uint32((chunk_buf.size() // 4) + 0x32)
-            elif chunk.type == "Texture" and chunk.textureType in {0x87, 0x88, 0x89}: # is BTX/DDS Texture
-                br.write_uint32(chunk_buf.size() // 4)  # need to look how BTX/DDS Chunk size is calculated
-            else:
-                br.write_uint32(chunk_buf.size() // 4)
-            # Write chunk data
-            br.write_bytes(bytes(chunk_buf.buffer()))
-            chunk_end = br.pos()
-            #print(f"chunk_start: {chunk_start}, chunk_end: {chunk_end}, chunk_buf.size: {chunk_buf.size()}")
+                # Write chunk type
+                br.write_uint16(CCSTypes[chunk.type].value)
+                br.write_uint16(0xCCCC)  # Write 0xCCCC bytes
 
-        # End stream file test
-        br.write_uint16(CCSTypes.Stream.value) # Stream Type
-        br.write_uint16(0xCCCC) # Write 0xCCCC bytes
-        br.write_uint32(1) # Size
-        br.write_uint32(1) # Frame Count
-        br.write_uint16(CCSTypes.Frame.value) # Frame Chunk
-        br.write_uint16(0xCCCC) # Write 0xCCCC bytes
-        br.write_uint32(1) # Size
-        #br.write_uint32(0xffffffff) # keyframe
-        br.write_int32(-1) # keyframe
+                # Create chunk buffer data
+                chunk_start = br.pos()
+
+                chunk_buf = BinaryReader()
+                if chunk.type == "Animation":
+                    chunk_buf.write_struct(chunk, exportVersion, self.sortedChunks)
+                else:
+                    chunk_buf.write_struct(chunk, exportVersion)
+
+                # Write chunk size
+                if chunk.type == "Texture":
+                    if chunk.textureType in {0x0, 0x13, 0x14}: # is RGBA32/I8/I4 Texture
+                        br.write_uint32((chunk_buf.size() // 4) + 0x32)
+                    elif chunk.textureType in {0x87, 0x88, 0x89}: # is BTX/DDS Texture
+                        br.write_uint32(chunk_buf.size() // 4)  # need to look how BTX/DDS Chunk size is calculated
+                    else:
+                        br.write_uint32(chunk_buf.size() // 4)
+                else:
+                    br.write_uint32(chunk_buf.size() // 4)
+                # Write chunk data
+                br.write_bytes(bytes(chunk_buf.buffer()))
+                chunk_end = br.pos()
+                #print(f"chunk_start: {chunk_start}, chunk_end: {chunk_end}, chunk_buf.size: {chunk_buf.size()}")
+
+        # Write chunk type
+        br.write_uint16(CCSTypes[self.stream.type].value)
+        br.write_uint16(0xCCCC)  # Write 0xCCCC bytes
+
+        stream_buf = BinaryReader()
+        stream_buf.write_struct(self.stream, exportVersion, self.sortedChunks)
+
+        br.write_uint32(stream_buf.size() // 4)
+        br.write_bytes(bytes(stream_buf.buffer()))
+        print(f'Stream chunk writen {self.stream}')
+        streamChunkWriten = True
+
+        if not streamChunkWriten:
+            br.write_uint16(CCSTypes.Stream.value) # Stream Type
+            br.write_uint16(0xCCCC) # Write 0xCCCC bytes
+            br.write_uint32(1) # Size
+            br.write_uint32(1) # Frame Count
+            br.write_uint16(CCSTypes.Frame.value) # Frame Chunk
+            br.write_uint16(0xCCCC) # Write 0xCCCC bytes
+            br.write_uint32(1) # Size
+            #br.write_uint32(0xffffffff) # keyframe
+            br.write_int32(-1) # keyframe
+            print(f'Empty Stream chunk writen')
+            streamChunkWriten = True
 
 
 

@@ -86,7 +86,7 @@ ccsDict = {
     0x0502: "",
     0x0503: "cameraController",
     0x0600: "ccsLight",
-    0x0601: "",
+    0x0601: "ambientFrame",
     0x0602: "",
     0x0603: "distantLightController",
     0x0604: "",
